@@ -21,7 +21,7 @@ class CreateController extends Controller
         if (!$isUserParticipantOnEntreprise) {
             return response()->json([
                 'message' => trans('messages.not_participant')
-            ]);
+            ], 403);
         }
 
         $transaction = Transaction::create([
@@ -33,15 +33,30 @@ class CreateController extends Controller
 
         if ($transaction) {
             $entreprise = Entreprise::find($transaction->entreprise_id);
-            if ($transaction->type === 'ADD') {
-                $entreprise->update([
-                    'amount_entre' => $entreprise->amount_entre + $transaction->amount
-                ]);
-            } else {
-                $entreprise->update([
-                    'amount_entre' => $entreprise->amount_entre - $transaction->amount,
-                    'amount_out' => $entreprise->amount_out + $transaction->amount
-                ]);
+            switch ($transaction->type){
+                case 'ADD':
+                    $entreprise->update([
+                        'amount_entre' => $entreprise->amount_entre + $transaction->amount
+                    ]);
+                    break;
+                case 'MINUS':
+                    if($entreprise->amount_entre <= 0 && $entreprise->amount_entre < $request->amount){
+                        $transaction->delete();
+                        return response()->json([
+                            'message' => trans('messages.no_money_there')
+                        ], 403);
+                        break;
+                    }
+                    $entreprise->update([
+                        'amount_entre' => $entreprise->amount_entre - $transaction->amount,
+                        'amount_out' => $entreprise->amount_out + $transaction->amount
+                    ]);
+                    break;
+                default:
+                    return response()->json([
+                        'message' => trans('validation.transaction_type')
+                    ], 403);
+                    
             }
         }
 

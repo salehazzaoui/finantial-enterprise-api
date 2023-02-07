@@ -19,12 +19,44 @@ class TransactionTest extends TestCase
      * @return void
      */
     /**@test */
-    public function test_create_ADD_transaction()
+    public function test_create_transaction_since_user_not_participant()
     {
-        /*$admin = User::factory()->create();
+        $user1 = User::factory()->create([
+            'isAdmin' => 0,
+            'phone_numbre' => '0654841235'
+        ]);
+        $admin = User::factory()->create();
+
         $entreprise = Entreprise::factory()->create([
             'owner_id' => $admin->id
         ]);
+
+        $response = $this->actingAs($user1)->postJson('/api/v1/entreprise/' . $entreprise->id . '/transaction', [
+            'user_id' => $user1->id,
+            'entreprise_id' => $entreprise->id,
+            'type' => 'ADD',
+            'amount' => 150.00,
+        ]);
+
+
+        $response->assertStatus(403)
+            ->assertJson(
+                fn (AssertableJson $json) =>
+                $json->has('message')
+            );
+
+    }
+
+    /**@test */
+    public function test_create_transaction_type_of_add()
+    {
+        $admin = User::factory()->create();
+
+        $entreprise = Entreprise::factory()->create([
+            'owner_id' => $admin->id
+        ]);
+
+        $admin->companies()->attach($entreprise->id);
 
         $response = $this->actingAs($admin)->postJson('/api/v1/entreprise/' . $entreprise->id . '/transaction', [
             'user_id' => $admin->id,
@@ -33,27 +65,83 @@ class TransactionTest extends TestCase
             'amount' => 150.00,
         ]);
 
-        $entreprise = Entreprise::find($entreprise->id);
-        //dd($entreprise);
-
-        $this->assertTrue($entreprise->amount_entre === 150.00);
 
         $response->assertStatus(201)
             ->assertJson(
                 fn (AssertableJson $json) =>
                 $json->has('message')
-                    ->has('transaction')
-            );*/
-        $response = $this->get('/');
+                     ->has('transaction')
+            );
 
-        $response->assertStatus(200);
+        $entreprise_after_transaction = Entreprise::find($entreprise->id);
+
+        $this->assertEquals(150.00, $entreprise_after_transaction->amount_entre);
+
     }
 
     /**@test */
-    public function test_create_MINUS_transaction()
+    public function test_create_transaction_type_of_minus_and_amount_entre_less_than_0_or_the_amount()
     {
-        $response = $this->get('/');
+        $admin = User::factory()->create();
 
-        $response->assertStatus(200);
+        $entreprise = Entreprise::factory()->create([
+            'owner_id' => $admin->id
+        ]);
+
+        $admin->companies()->attach($entreprise->id);
+
+        $response = $this->actingAs($admin)->postJson('/api/v1/entreprise/' . $entreprise->id . '/transaction', [
+            'user_id' => $admin->id,
+            'entreprise_id' => $entreprise->id,
+            'type' => 'MINUS',
+            'amount' => 150.00,
+        ]);
+
+
+        $response->assertStatus(403)
+            ->assertJson(
+                fn (AssertableJson $json) =>
+                $json->has('message')
+            );
+    }
+
+    /**@test */
+    public function test_create_transaction_type_of_minus()
+    {
+        $admin = User::factory()->create();
+
+        $entreprise = Entreprise::factory()->create([
+            'owner_id' => $admin->id
+        ]);
+
+        $admin->companies()->attach($entreprise->id);
+        
+        $this->actingAs($admin)->postJson('/api/v1/entreprise/' . $entreprise->id . '/transaction', [
+            'user_id' => $admin->id,
+            'entreprise_id' => $entreprise->id,
+            'type' => 'ADD',
+            'amount' => 150.00,
+        ]);
+
+        $response = $this->actingAs($admin)->postJson('/api/v1/entreprise/' . $entreprise->id . '/transaction', [
+            'user_id' => $admin->id,
+            'entreprise_id' => $entreprise->id,
+            'type' => 'MINUS',
+            'amount' => 150.00,
+        ]);
+
+
+        $response->assertStatus(201)
+            ->assertJson(
+                fn (AssertableJson $json) =>
+                $json->has('message')
+                     ->has('transaction')
+            );
+
+        $entreprise_after_transaction = Entreprise::find($entreprise->id);
+  
+        $this->assertEquals(0,00, $entreprise_after_transaction->amount_entre);
+        $this->assertEquals(150.00, $entreprise_after_transaction->amount_out);
+
     }
 }
